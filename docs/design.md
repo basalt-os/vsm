@@ -94,11 +94,15 @@ the knowledge and planner versions.
 
 ## Failure handling
 
-The assistant checks the knowledge index each time it opens it (manifest
-checksum, table layout, Fedora release, DSL version shared with the
-planner). If the packages are missing, damaged or for another DSL, or a
-question takes more than 2 seconds, the rules answer, marked as a
-fallback, and the reason is recorded.
+VSM is the default decision backend. The assistant checks the knowledge
+index each time it opens it: the detached OpenPGP signature of the
+manifest by the OpenBasalt knowledge signing subkey (the release key and
+the subkey fingerprints are pinned in the code, and the check uses only
+Go's standard library), the checksums of the cases and of the index
+table, the table layout, the Fedora release and the DSL version shared
+with the planner. If the packages are missing, damaged, unsigned or for
+another DSL, or a question takes more than 2 seconds, the rules answer,
+marked as a fallback, and the reason is recorded.
 
 ## Confinement
 

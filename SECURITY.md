@@ -25,7 +25,8 @@ Examples of what we want to hear about:
   makes VSM pick a case with a fix the evidence does not support, or gets
   past the deterministic guard;
 - a way to make the assistant load weights or knowledge that were not
-  shipped in a signed package, or that fail their checksums;
+  shipped in a signed package, knowledge whose manifest signature does
+  not verify, or files that fail their checksums;
 - action binding that puts attacker-controlled text into a proposed
   command in a way the validation does not catch;
 - anything in the released weights or knowledge index that leaks data it
@@ -60,6 +61,7 @@ before trusting it:
 
 - primary key `3601 7348 42BD 4E48 2D19  DE4A E4EE D5EC A395 B302`
 - packages signing subkey `3024 61D2 6520 E077 D07F  FCA9 AA27 C62C 36CC FC4B`
+- knowledge signing subkey `85D6 1430 B704 3868 0F6E  B955 E79E 4020 605A 659A`
 
 The file checksums of each release are listed in the
 [README](README.md#verifying-a-release).

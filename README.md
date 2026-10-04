@@ -54,9 +54,10 @@ counts, and its quality is measured against suites and injected faults
 
 Every decision goes to the assistant's local audit log with the picked
 case, the candidates, the evidence and the knowledge and planner versions.
-If the data packages are missing, damaged or for another version, or a
-question takes more than 2 seconds, the assistant falls back to its rules
-and records why. New problems arrive as new knowledge cases, a data
+VSM is the assistant's default decision backend since basalt-assistant
+0.8.0. If the data packages are missing, damaged, unsigned or for another
+version, or a question takes more than 2 seconds, the assistant falls
+back to its rules and records why. New problems arrive as new knowledge cases, a data
 update, not as a new model.
 
 A longer description is in [docs/design.md](docs/design.md).
@@ -86,9 +87,10 @@ reuse what ships in Basalt OS is open.
 
 ## Results
 
-Measured on 2026-10-04 with basalt-assistant 0.6.2, knowledge index
-44.20261003 (37 cases) and planner 2.20261003, against the assistant's
-own rules (the default backend).
+Measured on 2026-10-04 with basalt-assistant 0.7.0, knowledge index
+44.20261004 (39 cases) and planner 3.20261004, against the assistant's
+own rules (now the fallback). basalt-assistant 0.8.0 changes only the
+default backend; the suite gives the same numbers with it.
 
 Evaluation suite (253 questions over 239 cases: 34 from a lab machine, 30
 from the confined daemon on that machine, 189 generated):
@@ -96,19 +98,25 @@ from the confined daemon on that machine, 189 generated):
 | Backend | Accuracy | ECE | Brier | Lab | Lab, confined daemon | Generated |
 |---|---|---|---|---|---|---|
 | rules | 96.8 % | 0.212 | 0.138 | 32/34 | 29/30 | 184/189 |
-| VSM | 97.6 % | 0.020 | 0.050 | 32/34 | 28/30 | 187/189 |
+| VSM | 98.0 % | 0.020 | 0.042 | 32/34 | 29/30 | 187/189 |
 
 ECE (expected calibration error) and Brier measure how well the stated
 confidence matches how often the answer is right; lower is better.
 
-35 faults injected one at a time on a lab virtual machine, each diagnosed
-by the root command line and by the confined daemon (11 of the 35 come
-from fault families held out of the knowledge cases):
+Faults injected one at a time on a lab virtual machine, each diagnosed by
+the root command line and by the confined daemon: 35 faults from earlier
+runs and 15 new ones, written and committed before any engine ran on them
+(a fresh held-out set):
 
-| Backend | Root: answers right | Root: changes right | Daemon: answers right | Daemon: changes right | Unsafe proposals |
+| Set | Backend | Root: answers right | Daemon: answers right | ECE root / daemon | Unsafe proposals |
 |---|---|---|---|---|---|
-| rules | 33/35 | 34/35 | 31/35 | 31/35 | 0 |
-| VSM | 33/35 | 34/35 | 30/35 | 30/35 | 0 |
+| earlier 35 | rules | 33/35 | 31/35 | 0.27 / 0.19 | 0 |
+| earlier 35 | VSM | 33/35 | 31/35 | 0.01 / 0.13 | 0 |
+| new 15 | rules | 14/15 | 12/15 | 0.23 / 0.17 | 0 |
+| new 15 | VSM | 14/15 | 12/15 | 0.06 / 0.11 | 0 |
+
+The changes proposed were right exactly where the answers were, for both
+backends, and the rules never had to stand in for VSM during these runs.
 
 The suite, the evaluation command, the runtime, the weights and the
 knowledge index are all public, so the suite numbers can be reproduced on
@@ -117,28 +125,34 @@ any Fedora 44 machine; the steps are in
 in basalt-os/basalt-os. The fault-injection harness runs on our lab
 machines and is not packaged for outside use yet.
 
-Cost: about 1 ms per question and about 0.4 MB of memory for the knowledge
-index and the planner together.
+Cost: about 1 ms per question in the suite (about 4 ms on the lab machine)
+and about 0.4 MB of memory for the knowledge index and the planner
+together.
 
 Caveats, stated plainly:
 
-- VSM is optional and not the default. The rules stay the default because
-  VSM is one answer behind them on the confined daemon's view in both
-  measurements, and the bar for switching is "at least as good on every
-  source".
+- VSM became the default because it now meets the bar we set for that,
+  "at least as good as the rules on every source": equal or better on the
+  suite, equal answers and equal changes on both live sets in both views,
+  no unsafe proposals, and much better calibrated. The rules stay as the
+  fallback, and `backend = rules` under `[decision]` in
+  `/etc/basalt/assistant.conf` turns VSM off.
 - An earlier live run the same day, with assistant 0.6.0, found two unsafe
   proposals. Both came from how the assistant used VSM's answer, not from
   the model's pick, and were fixed with two deterministic checks in 0.6.2
   (a fix is proposed only when the confident answer equals the class the
   fix was built for). The table above is after that fix.
-- The samples are small (37 known cases, 35 injected faults) and most of
+- The samples are small (39 known cases, 50 injected faults) and most of
   the suite is generated. They show the design works on the problems it
   covers; they say nothing about problems no case covers yet, where the
   expected answer is "unknown".
-- Calibration is very good on the suite. Live, when the confined daemon
-  cannot see enough and the right answer is the cautious one, VSM is
-  overconfident in that cautious answer. That is a known limit we are
-  working on.
+- Calibration is very good on the suite. On the confined daemon's view
+  the live ECE is still 0.11 to 0.13: when VSM abstains there, part of the
+  probability now goes to the causes the daemon could not see, which
+  fixed most of the earlier overconfidence but not all of it.
+- One answer on the new set was overconfident: a permissive SELinux
+  denial with no known fix, answered "unknown" at 0.995 in the root view.
+  The answer was the cautious one and no change was proposed.
 - Only Fedora 44 has a knowledge index today.
 
 The same numbers, with more detail on the assistant side, are in the
@@ -156,6 +170,7 @@ are signed with the OpenBasalt release key:
 - key: <https://obpkg.org/keys/openbasalt-release-key.asc>
 - primary key fingerprint: `3601 7348 42BD 4E48 2D19  DE4A E4EE D5EC A395 B302`
 - packages signing subkey: `3024 61D2 6520 E077 D07F  FCA9 AA27 C62C 36CC FC4B`
+- knowledge signing subkey: `85D6 1430 B704 3868 0F6E  B955 E79E 4020 605A 659A`
 
 On Basalt OS the key is already installed and dnf checks both signatures.
 Elsewhere, check the key and a package by hand:
@@ -164,8 +179,8 @@ Elsewhere, check the key and a package by hand:
 curl -fsSLO https://obpkg.org/keys/openbasalt-release-key.asc
 gpg --show-keys --with-fingerprint openbasalt-release-key.asc
 sudo rpm --import openbasalt-release-key.asc
-curl -fsSLO https://obpkg.org/basalt/44/x86_64/basalt-vsm-planner-2.20261003-1.fc44.noarch.rpm
-rpm -K basalt-vsm-planner-2.20261003-1.fc44.noarch.rpm
+curl -fsSLO https://obpkg.org/basalt/44/x86_64/basalt-vsm-planner-3.20261004-2.fc44.noarch.rpm
+rpm -K basalt-vsm-planner-3.20261004-2.fc44.noarch.rpm
 ```
 
 `rpm -K` must print `digests signatures OK`. Then check the files against
@@ -174,22 +189,35 @@ the checksums pinned in the public repository (`sources.manifest` in
 basalt-os/basalt-os):
 
 ```sh
-rpm2cpio basalt-vsm-planner-2.20261003-1.fc44.noarch.rpm | cpio -idm
-sha256sum usr/share/basalt/vsm-planner/weights.bin usr/share/basalt/vsm-planner/config.txt
+rpm2cpio basalt-vsm-planner-3.20261004-2.fc44.noarch.rpm | cpio -idm
+sha256sum usr/share/basalt/vsm-planner/*
 ```
 
 | Package | File | SHA-256 |
 |---|---|---|
-| basalt-vsm-planner 2.20261003 | weights.bin | `41e8c37852375eaf70bf16230c9ded8a2d59f1371be37e6b932961ed2e6e6523` |
-| basalt-vsm-planner 2.20261003 | config.txt | `0377aa2e5d047ddc97b36ddc345edc305702195e94d62702fd348519c50155ea` |
-| basalt-knowledge 44.20261003 | cases.jsonl | `437fcc78e9aa6e55e5567b77b54f32bf58af9843c21a7ae97acb2af278636473` |
-| basalt-knowledge 44.20261003 | index.bin | `c3817c412f4069db1a01143da09302799f426f797ebca92d282777115ff699a5` |
-| basalt-knowledge 44.20261003 | manifest.json | `98914caf2b0972404eb8888835a7be0733430e8f5929191ba3e50973479e6e61` |
+| basalt-vsm-planner 3.20261004 | weights.bin | `71351ce5144ed98e9b2c45fd6e7990116a315d0e8a7532e5e1acbb30dc0e5290` |
+| basalt-vsm-planner 3.20261004 | config.txt | `86060318f9fd8dd270672acda42a9b27bb16d4832c6801e4519324ec8cc832b9` |
+| basalt-vsm-planner 3.20261004 | calibration.json | `a67311a1eb5d29c4933debe6dc1d2b1128d0ab03976c7e6c09abfd5f7bc4411c` |
+| basalt-knowledge 44.20261004 | cases.jsonl | `ed3e96f53d140fcbb885c5901f1a35fe62b43b5b469bf9dbe86fd8d28965e7eb` |
+| basalt-knowledge 44.20261004 | index.bin | `f8bfcad7aa5dbf48230e2a3a799d71190c41107dabfb0457bab94136b278411e` |
+| basalt-knowledge 44.20261004 | manifest.json | `fb946ade619cd9ef9bbf1f942da2357184bff0879e94358c84c76c2ac50b8064` |
+| basalt-knowledge 44.20261004 | manifest.json.sig | `861408663ae70f4a75c7b6a6f89fae702cef897bea407aa41ff7cb34ba2bdbb9` |
 
-The knowledge `manifest.json` also carries the SHA-256 of `cases.jsonl`,
-and the assistant checks it, the table layout and the version each time it
-opens the index. A detached signature on the manifest itself is planned;
-today the integrity chain is the package signature plus these checksums.
+The knowledge index is signed on its own as well. Its `manifest.json`
+carries the SHA-256 of `cases.jsonl` and of `index.bin`, and
+`manifest.json.sig` is a detached OpenPGP signature of the manifest by the
+knowledge signing subkey above. The assistant checks that signature (with
+both fingerprints pinned in its code), the checksums, the table layout and
+the version each time it opens the index; if anything does not match, the
+rules answer and the decision record says why. Anyone can make the same
+check with standard tools on an installed system:
+
+```sh
+gpg --dearmor </usr/share/basalt/knowledge/openbasalt-release-key.asc >openbasalt-release-key.gpg
+gpgv --keyring ./openbasalt-release-key.gpg \
+     /usr/share/basalt/knowledge/44/manifest.json.sig /usr/share/basalt/knowledge/44/manifest.json
+sha256sum /usr/share/basalt/knowledge/44/cases.jsonl /usr/share/basalt/knowledge/44/index.bin
+```
 
 ## Privacy
 

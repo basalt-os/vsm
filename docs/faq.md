@@ -16,12 +16,12 @@ The assistant daemon has no network access, and VSM has no telemetry.
 
 ## Is it on by default?
 
-Not yet. VSM is an optional backend; the assistant's rules are the
-default. We switch the default only when VSM is at least as good as the
-rules on every source we measure, and today it is one answer behind on the
-confined daemon's view. To try it, set `backend = vsm` under `[decision]`
-in `/etc/basalt/assistant.conf` and install `basalt-knowledge` and
-`basalt-vsm-planner`.
+Yes, since basalt-assistant 0.8.0. We switched the default once VSM was
+at least as good as the rules on every source we measure (see the README).
+The assistant recommends `basalt-knowledge` and `basalt-vsm-planner`, so a
+default install has them, and the rules stay as the fallback. To use the
+rules only, set `backend = rules` under `[decision]` in
+`/etc/basalt/assistant.conf`.
 
 ## Can I use the weights outside Basalt?
 
@@ -54,7 +54,9 @@ promise one we might miss. When that changes, it will be announced here.
 
 Check the package signature with the OpenBasalt release key, then compare
 the file checksums with the ones in the README and in the `sources.manifest`
-files of basalt-os/basalt-os. The results in the README name the exact
+files of basalt-os/basalt-os. The knowledge index also carries its own
+signature by the OpenBasalt knowledge signing subkey, which the assistant
+checks every time it loads the index. The results in the README name the exact
 package versions they were measured with.
 
 ## What happens with a problem VSM has never seen?
