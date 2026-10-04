@@ -1,0 +1,10 @@
+VSM (Verified Specialist Model) public overview
+Copyright 2026 Edimar Cardoso and the Basalt OS contributors.
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This repository contains documentation only. The VSM runtime is part of
+basalt-assistant in https://github.com/basalt-os/basalt-os, and the planner
+weights (basalt-vsm-planner) and the knowledge index (basalt-knowledge) are
+released as packages at https://obpkg.org/basalt/. Each of them is also
+licensed under the Apache License, Version 2.0, with its own license file.
